@@ -57,6 +57,17 @@ header.top{position:sticky;top:0;z-index:30;background:rgba(237,242,240,.93);bac
 .qpill .lg{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#7f5cff,#b44dff);display:grid;place-items:center;flex:none}
 .qpill .lg svg{width:18px;height:18px}
 .qpill{white-space:nowrap}.qpill b{display:block;font-size:14px;line-height:1.1}@media(min-width:701px){.toprow{padding-right:190px}}.qpill span{display:block;font-size:11px;opacity:.7}
+.qmlock{margin-left:auto;opacity:.75;flex:none}
+.qmlockbg{position:fixed;inset:0;background:rgba(10,20,26,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px}
+.qmlockbg[hidden]{display:none}
+.qmlockbox{background:#fff;color:#14212B;border-radius:18px;max-width:380px;width:100%;padding:28px 24px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.qmlockbox .ic{width:52px;height:52px;border-radius:50%;background:#E3F3EF;color:#0E7C6B;display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+.qmlockbox h3{font-size:20px;margin-bottom:8px}
+.qmlockbox p{font-size:14px;line-height:1.55;color:#64727D;margin-bottom:18px}
+.qmlockbox .row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.qmlockbox button{border-radius:10px;padding:10px 16px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;border:1px solid #E2E8ED;background:#fff;color:#14212B}
+.qmlockbox button.go{background:#0E7C6B;border-color:#0E7C6B;color:#fff}
+.qmlockbox .x{display:block;margin:12px auto 0;border:0;background:none;font-size:13px;color:#64727D;font-weight:500}
 .qmguest{display:flex;gap:8px;margin-left:10px;flex:none}
 .qmguest[hidden]{display:none}
 .qmguest button{border-radius:10px;padding:8px 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink)}
@@ -2054,7 +2065,7 @@ function navHTML(){
   const items=[["home",t.home,"grid"],["learn",t.learn,"book"],["live",t.live,"radio"],
     ["assess",t.assess,"clip"],["quiz",t.quiz,"bolt"],["progress",t.progress,"trend"],["awards",t.awards,"medal"],["lab",t.lab,"flask"]];
   return '<div class="nav">'+items.map(n=>'<button class="'+(state.view===n[0]?'on':'')+'" onclick="go(\''+n[0]+'\')">'+
-    I[n[2]](18)+'<span>'+n[1]+'</span></button>').join('')+'</div>';
+    I[n[2]](18)+'<span>'+n[1]+'</span>'+(qmIsLocked(n[0])?QM_LOCK:'')+'</button>').join('')+'</div>';
 }
 function title(){
   const t=T(), map={home:t.home,learn:t.learn,live:t.live,assess:t.assess,quiz:t.quiz,progress:t.progress,awards:t.awards,lab:t.lab};
@@ -2225,9 +2236,36 @@ window.addEventListener('message',e=>{
   if(e.origin!==QM_ORIGIN||!e.data||e.data.type!=='qmaz-profile') return;
   const d=e.data; qmProfile={signedIn:!!d.signedIn,name:String(d.name||'').slice(0,80),email:String(d.email||'').slice(0,120),photo:(typeof d.photo==='string'&&/^data:image\/(jpeg|png|webp);base64,/.test(d.photo))?d.photo:''};
   paintQm();
+  if(qmIsLocked(state.view)){state.view='home';render();}
+  else{const nv=document.querySelector('.side .nav'); if(nv) nv.outerHTML=navHTML();}
 });
 const _renderQm=render; render=function(){_renderQm();paintQm();};
-function go(v){state.view=v;state.navOpen=false;state.labOpen=null;render();window.scrollTo(0,0);}
+/* ── Lock sections until the student signs in to Qmaz ── */
+const QM_LOCKED=['learn','live','assess','quiz','progress','awards','lab'];
+const QM_LOCK='<svg class="qmlock" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+function qmSigned(){return !!(qmProfile&&qmProfile.signedIn);}
+function qmIsLocked(v){return state.role==='student'&&QM_LOCKED.indexOf(v)>=0&&!qmSigned();}
+function qmShowLock(){
+  let m=document.getElementById('qmLockBg');
+  if(!m){m=document.createElement('div');m.id='qmLockBg';m.className='qmlockbg';
+    m.innerHTML='<div class="qmlockbox" role="dialog" aria-modal="true"><div class="ic">'+QM_LOCK.replace('width="15" height="15"','width="26" height="26"').replace(' class="qmlock"','')+'</div>'+
+    '<h3>This section is locked</h3><p>Sign in to Qmaz Solutions to unlock Learn, Live classes, Assignment, Quiz, Progress Report, Achievements and Lab.</p>'+
+    '<div class="row"><button onclick="qmLockGo(\'signin\')">Login</button><button class="go" onclick="qmLockGo(\'signup\')">Start for Free</button></div>'+
+    '<button class="x" onclick="qmHideLock()">Not now</button></div>';
+    m.addEventListener('click',e=>{if(e.target===m)qmHideLock();});document.body.appendChild(m);}
+  m.hidden=false;
+}
+function qmHideLock(){const m=document.getElementById('qmLockBg');if(m)m.hidden=true;}
+function qmLockGo(cmd){
+  qmHideLock(); go('home');
+  const f=document.getElementById('qmFrame'); if(!f) return;
+  const send=()=>{try{f.contentWindow.postMessage({type:'qmaz-cmd',cmd:cmd},QM_ORIGIN);}catch(e){}};
+  f.addEventListener('load',()=>setTimeout(send,400),{once:true});
+}
+function go(v){
+  if(qmIsLocked(v)){state.navOpen=false;qmShowLock();render();return;}
+  state.view=v;state.navOpen=false;state.labOpen=null;render();window.scrollTo(0,0);
+}
 function setRole(r){state.role=r;state.view="home";render();}
 function setLang(l){state.lang=l;render();}
 function setFilter(f){state.filter=f;render();}
