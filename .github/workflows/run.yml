@@ -29,16 +29,104 @@ jobs:
         if: ${{ inputs.mode == 'off' }}
         run: |
           mkdir offline_build
-          cat > offline_build/index.html <<'EOF'
+          cat > offline_build/index.html <<'HTMLEOF'
           <!DOCTYPE html>
           <html lang="en">
-          <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>Site offline</title>
-          <style>body{font-family:system-ui,sans-serif;background:#E8EDF3;color:#192436;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
+          <style>
+          body{font-family:system-ui,sans-serif;background:#E8EDF3;color:#192436;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
           .box{text-align:center;background:#fff;border:1px solid #D4DCE6;border-radius:14px;padding:48px 40px;max-width:380px}
-          h1{font-size:1.4rem;margin:0 0 8px}p{color:#5B6B82;font-size:.95rem;margin:0}</style></head>
-          <body><div class="box"><h1>This site is offline</h1><p>It has not been run yet. Please check back later.</p></div></body></html>
-          EOF
+          h1{font-size:1.4rem;margin:0 0 8px}
+          .box p{color:#5B6B82;font-size:.95rem;margin:0}
+          #chatBtn{position:fixed;right:22px;bottom:22px;width:58px;height:58px;border-radius:50%;border:none;cursor:pointer;background:#1D5BDC;color:#fff;font-size:1.5rem;box-shadow:0 4px 14px rgba(25,36,54,.25)}
+          #chatBtn:hover{background:#1546A8}
+          #chatPanel{display:none;position:fixed;right:22px;bottom:92px;width:320px;max-width:calc(100vw - 44px);background:#fff;border:1px solid #D4DCE6;border-radius:14px;box-shadow:0 8px 30px rgba(25,36,54,.25);overflow:hidden;flex-direction:column}
+          #chatHead{background:#1D5BDC;color:#fff;padding:14px 16px;font-weight:600;font-size:.95rem}
+          #chatMsgs{padding:14px;height:230px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;background:#F7F9FC}
+          .m{max-width:85%;padding:9px 12px;border-radius:12px;font-size:.88rem;line-height:1.4}
+          .m.bot{background:#fff;border:1px solid #D4DCE6;align-self:flex-start}
+          .m.me{background:#1D5BDC;color:#fff;align-self:flex-end}
+          #chatForm{display:flex;gap:8px;padding:10px;border-top:1px solid #D4DCE6;background:#fff}
+          #chatInput{flex:1;border:1px solid #D4DCE6;border-radius:8px;padding:9px 10px;font-family:inherit;font-size:.88rem}
+          #chatInput:focus{outline:2px solid #1D5BDC}
+          #chatSend{border:none;border-radius:8px;background:#1D5BDC;color:#fff;font-family:inherit;font-weight:600;font-size:.88rem;padding:9px 14px;cursor:pointer}
+          #chatSend:disabled{opacity:.6}
+          #nameRow{padding:10px 10px 0;background:#fff;border-top:1px solid #D4DCE6}
+          #nameInput{width:100%;box-sizing:border-box;border:1px solid #D4DCE6;border-radius:8px;padding:8px 10px;font-family:inherit;font-size:.85rem}
+          #nameInput:focus{outline:2px solid #1D5BDC}
+          </style>
+          </head>
+          <body>
+          <div class="box"><h1>This site is offline</h1><p>It has not been run yet. Please check back later.</p></div>
+
+          <button id="chatBtn" aria-label="Chat with the owner">&#128172;</button>
+          <div id="chatPanel">
+            <div id="chatHead">Message the owner</div>
+            <div id="chatMsgs"></div>
+            <div id="nameRow"><input id="nameInput" type="text" placeholder="Your name or phone/email (so the owner can reply)"></div>
+            <form id="chatForm">
+              <input id="chatInput" type="text" placeholder="Type your message..." autocomplete="off">
+              <button type="submit" id="chatSend">Send</button>
+            </form>
+          </div>
+
+          <script>
+          (function(){
+            'use strict';
+            var API = 'https://script.google.com/macros/s/AKfycbxY4cp66xInhzCfbt1j2jcPlFqOHjrOlgFrt_4pQMWke2EwLp9wPbpl5PbqJJQlYbfP/exec';
+            var panel = document.getElementById('chatPanel');
+            var msgs = document.getElementById('chatMsgs');
+            var opened = false;
+
+            function addMsg(text, who){
+              var d = document.createElement('div');
+              d.className = 'm ' + who;
+              d.textContent = text;
+              msgs.appendChild(d);
+              msgs.scrollTop = msgs.scrollHeight;
+            }
+
+            document.getElementById('chatBtn').addEventListener('click', function(){
+              var open = panel.style.display === 'flex';
+              panel.style.display = open ? 'none' : 'flex';
+              if (!open && !opened){
+                opened = true;
+                addMsg('Hi! This site is offline right now. Leave a message and the owner will get it by email straight away. Add your contact above so they can reply.', 'bot');
+              }
+              if (!open){ try { document.getElementById('chatInput').focus(); } catch(e){} }
+            });
+
+            document.getElementById('chatForm').addEventListener('submit', function(ev){
+              ev.preventDefault();
+              var inp = document.getElementById('chatInput');
+              var text = inp.value.trim();
+              if (!text) return;
+              var from = document.getElementById('nameInput').value.trim();
+              addMsg(text, 'me');
+              inp.value = '';
+              var btn = document.getElementById('chatSend');
+              btn.disabled = true;
+              fetch(API, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'contact', message: text, from: from, page: location.href })
+              }).then(function(r){ return r.json(); }).then(function(d){
+                btn.disabled = false;
+                if (d && d.ok) addMsg('Sent! The owner has been emailed your message.', 'bot');
+                else addMsg('Sorry, it could not be sent right now. Please try again in a while.', 'bot');
+              }).catch(function(){
+                btn.disabled = false;
+                addMsg('Sorry, it could not be sent - please check your internet and try again.', 'bot');
+              });
+            });
+          })();
+          </script>
+          </body>
+          </html>
+          HTMLEOF
 
       - name: Choose what to publish
         id: pick
