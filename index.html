@@ -279,6 +279,17 @@ footer.legal{display:flex;flex-wrap:wrap;gap:16px;margin-top:40px;padding-top:20
 .auth-switch button{color:var(--teal);font-weight:600;background:none;border:none;cursor:pointer;font:inherit}
 .auth-divider{display:flex;align-items:center;gap:12px;margin:18px 0;color:var(--mute);font-size:12px;font-family:var(--mono)}
 .auth-divider::before,.auth-divider::after{content:"";flex:1;height:1px;background:var(--line)}
+/* Coding Space */
+.cs-wrap{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:900px){.cs-wrap{grid-template-columns:1fr}}
+.cs-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line)}
+.cs-tab{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:6px 12px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.cs-tab.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.cs-run{margin-left:auto;background:#0E7C6B;color:#fff;border:0;border-radius:8px;padding:7px 16px;font:inherit;font-weight:700;cursor:pointer}
+.cs-ghost{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:6px 10px;font:inherit;font-size:12px;cursor:pointer}
+.cs-ed{display:block;width:100%;height:440px;border:0;outline:none;resize:vertical;padding:14px;background:#0F1B24;color:#E6EDF3;font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;tab-size:2;white-space:pre}
+.cs-pv{display:block;width:100%;height:440px;border:0;background:#fff}
+.cs-hint{padding:10px 14px;font-size:12px;color:var(--mute);border-top:1px solid var(--line)}
 </style>
 <!-- Google Translate -->
 <style>
@@ -413,6 +424,7 @@ const I = {
   cap:   s=>S('<path d="M2 8.5 12 4l10 4.5-10 4.5z"/><path d="M6 11v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/>',s),
   star:  s=>S('<polygon points="12 3 14.6 9.1 21 9.7 16.2 14 17.6 20.3 12 17 6.4 20.3 7.8 14 3 9.7 9.4 9.1"/>',s),
   trophy:s=>S('<path d="M7 4h10v6a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/><path d="M10 15h4l1 5H9z"/>',s),
+  code: s=>S('<path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/>',s),
   flask: s=>S('<path d="M9 2v6.5L3.8 18A2 2 0 0 0 5.6 21h12.8a2 2 0 0 0 1.8-3L15 8.5V2"/><path d="M8 2h8M6.5 14h11"/>',s),
   spark: s=>S('<path d="M12 2.5 14 9l6.5 2-6.5 2-2 6.5-2-6.5L3.5 11 10 9z"/>',s),
   cal:   s=>S('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',s),
@@ -2059,21 +2071,59 @@ function qzFinish(){
   saveQz(); render(); window.scrollTo(0,0);
 }
 
+/* ─────────── Coding Space ─────────── */
+const CS_START={
+ html:'<h1>Hello, coder! 👋</h1>\n<p id="msg">Click the button.</p>\n<button id="btn">Say hi</button>',
+ css:'body{font-family:system-ui,sans-serif;text-align:center;padding:30px;background:#F0F7F5}\nh1{color:#0E7C6B}\nbutton{background:#0E7C6B;color:#fff;border:0;border-radius:10px;padding:10px 18px;font-size:16px;cursor:pointer}',
+ js:'document.getElementById("btn").onclick=function(){\n  document.getElementById("msg").textContent="Hi! You just wrote code. 🎉";\n};'
+};
+let cs=(function(){try{const v=JSON.parse(localStorage.getItem('qe_coding')||'null');if(v&&v.html!=null)return Object.assign({tab:'html'},v);}catch(e){}return Object.assign({tab:'html'},CS_START);})();
+function csSave(){try{localStorage.setItem('qe_coding',JSON.stringify({html:cs.html,css:cs.css,js:cs.js}));}catch(e){}}
+function csDoc(){
+  return '<!DOCTYPE html><html><head><meta charset="utf-8"><style>'+cs.css+'</style></head><body>'+cs.html+
+    '<scr'+'ipt>try{'+cs.js.replace(/<\/script/gi,'<\\/script')+'}catch(e){document.body.insertAdjacentHTML("beforeend","<pre style=\\"color:#B3261E;white-space:pre-wrap\\">Error: "+String(e.message).replace(/</g,"&lt;")+"</pre>")}</scr'+'ipt></body></html>';
+}
+function csRun(){const f=document.getElementById('csPv');if(f)f.srcdoc=csDoc();}
+function csTab(t){cs.tab=t;render();}
+function csInput(el){cs[cs.tab]=el.value;csSave();}
+function csKey(e){
+  if(e.key==='Tab'){e.preventDefault();const el=e.target,a=el.selectionStart;el.value=el.value.slice(0,a)+'  '+el.value.slice(el.selectionEnd);el.selectionStart=el.selectionEnd=a+2;csInput(el);}
+  else if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();csRun();}
+}
+function csReset(){if(!confirm('Reset to the starter code? Your changes will be lost.'))return;cs=Object.assign({tab:'html'},CS_START);csSave();render();}
+function csDownload(){
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csDoc()],{type:'text/html'}));a.download='my-project.html';
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+function codeView(){
+  const tabs=[['html','HTML'],['css','CSS'],['js','JavaScript']].map(t=>'<button class="cs-tab'+(cs.tab===t[0]?' on':'')+'" onclick="csTab(\''+t[0]+'\')">'+t[1]+'</button>').join('');
+  setTimeout(csRun,0);
+  return '<div class="pagehead">'+eyebrow('Build & experiment')+'<h2 class="display">Coding Space</h2>'+
+    '<p class="muted">Write HTML, CSS and JavaScript and see the result live. Your code is saved on this device.</p></div>'+
+    '<div class="cs-wrap"><div class="card"><div class="cs-bar">'+tabs+
+      '<button class="cs-run" onclick="csRun()">▶ Run</button></div>'+
+      '<textarea class="cs-ed" id="csEd" spellcheck="false" autocapitalize="off" autocomplete="off" oninput="csInput(this)" onkeydown="csKey(event)">'+
+      String(cs[cs.tab]).replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</textarea>'+
+      '<div class="cs-hint">Tip: press Ctrl + Enter to run. &nbsp; <button class="cs-ghost" onclick="csReset()">Reset</button> <button class="cs-ghost" onclick="csDownload()">Download</button></div></div>'+
+    '<div class="card"><div class="cs-bar"><b>Preview</b></div>'+
+      '<iframe class="cs-pv" id="csPv" title="Preview" sandbox="allow-scripts"></iframe></div></div>';
+}
+
 /* ─────────── shell ─────────── */
 function navHTML(){
   const t=T();
   const items=[["home",t.home,"grid"],["learn",t.learn,"book"],["live",t.live,"radio"],
-    ["assess",t.assess,"clip"],["quiz",t.quiz,"bolt"],["progress",t.progress,"trend"],["awards",t.awards,"medal"],["lab",t.lab,"flask"]];
+    ["assess",t.assess,"clip"],["quiz",t.quiz,"bolt"],["progress",t.progress,"trend"],["awards",t.awards,"medal"],["lab",t.lab,"flask"],["code","Coding Space","code"]];
   return '<div class="nav">'+items.map(n=>'<button class="'+(state.view===n[0]?'on':'')+'" onclick="go(\''+n[0]+'\')">'+
     I[n[2]](18)+'<span>'+n[1]+'</span>'+(qmIsLocked(n[0])?QM_LOCK:'')+'</button>').join('')+'</div>';
 }
 function title(){
-  const t=T(), map={home:t.home,learn:t.learn,live:t.live,assess:t.assess,quiz:t.quiz,progress:t.progress,awards:t.awards,lab:t.lab};
+  const t=T(), map={home:t.home,learn:t.learn,live:t.live,assess:t.assess,quiz:t.quiz,progress:t.progress,awards:t.awards,lab:t.lab,code:"Coding Space"};
   return state.view==="home" ? t.greet+", "+ME().who.split(" ")[0] : map[state.view];
 }
 function bodyHTML(){
   if(state.view==="home") return {student:studentHome,parent:parentHome,teacher:teacherHome,admin:adminHome}[state.role]();
-  return {learn:learnView,live:liveView,assess:assessView,quiz:quizView,progress:progressView,awards:awardsView,lab:labView}[state.view]();
+  return {learn:learnView,live:liveView,assess:assessView,quiz:quizView,progress:progressView,awards:awardsView,lab:labView,code:codeView}[state.view]();
 }
 /* ─────────── auth screens ─────────── */
 function authScreen(){
@@ -2246,7 +2296,7 @@ window.addEventListener('message',e=>{
 });
 const _renderQm=render; render=function(){_renderQm();paintQm();};
 /* ── Lock sections until the student signs in to Qmaz ── */
-const QM_LOCKED=['learn','live','assess','quiz','progress','awards','lab'];
+const QM_LOCKED=['learn','live','assess','quiz','progress','awards','lab','code'];
 const QM_LOCK='<svg class="qmlock" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
 function qmSigned(){return !!(qmProfile&&qmProfile.signedIn);}
 function qmIsLocked(v){return state.role==='student'&&QM_LOCKED.indexOf(v)>=0&&!qmSigned();}
@@ -2254,7 +2304,7 @@ function qmShowLock(){
   let m=document.getElementById('qmLockBg');
   if(!m){m=document.createElement('div');m.id='qmLockBg';m.className='qmlockbg';
     m.innerHTML='<div class="qmlockbox" role="dialog" aria-modal="true"><div class="ic">'+QM_LOCK.replace('width="15" height="15"','width="26" height="26"').replace(' class="qmlock"','')+'</div>'+
-    '<h3>This section is locked</h3><p>Sign in to Qmaz Solutions to unlock Learn, Live classes, Assignment, Quiz, Progress Report, Achievements and Lab.</p>'+
+    '<h3>This section is locked</h3><p>Sign in to Qmaz Solutions to unlock Learn, Live classes, Assignment, Quiz, Progress Report, Achievements, Lab and Coding Space.</p>'+
     '<div class="row"><button onclick="qmHideLock();qmLoginOpen()">Login</button><button class="go" onclick="qmLockGo(\'signup\')">Start for Free</button></div>'+
     '<button class="x" onclick="qmHideLock()">Not now</button></div>';
     m.addEventListener('click',e=>{if(e.target===m)qmHideLock();});document.body.appendChild(m);}
