@@ -108,6 +108,24 @@ jobs:
             ping();
             setInterval(ping, 20000);
 
+            // open the site for THIS visitor only (their pass was granted by the script)
+            function openApp(){
+              setTimeout(function(){
+                location.replace('app/?u=' + VID);
+              }, 1200);
+            }
+
+            // if this visitor already holds a valid pass, let them straight in
+            try {
+              fetch(API, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'access_check', vid: VID })
+              }).then(function(r){ return r.json(); }).then(function(d){
+                if (d && d.ok && d.allowed) location.replace('app/?u=' + VID);
+              }).catch(function(){});
+            } catch(e){}
+
             var panel = document.getElementById('chatPanel');
             var msgs = document.getElementById('chatMsgs');
             var opened = false;
@@ -135,34 +153,6 @@ jobs:
               msgs.appendChild(wrap);
               msgs.scrollTop = msgs.scrollHeight;
               return st;
-            }
-
-            // the script started deploying the site: wait for it to come online, then open it
-            var waitingForSite = false;
-            function waitForSiteLive(){
-              if (waitingForSite) return;
-              waitingForSite = true;
-              var tries = 0;
-              var iv = setInterval(function(){
-                tries++;
-                if (tries > 24){
-                  clearInterval(iv);
-                  waitingForSite = false;
-                  addMsg('It is taking a little longer than usual - please reload this page in a minute.', 'bot');
-                  return;
-                }
-                fetch(location.pathname + '?live=' + Date.now(), { cache: 'no-store' })
-                  .then(function(r){ return r.text(); })
-                  .then(function(t){
-                    if (t.indexOf('This site is offline') === -1){
-                      clearInterval(iv);
-                      addMsg('The site is ready - opening it now!', 'bot');
-                      setTimeout(function(){
-                        location.replace(location.pathname + '?v=' + Date.now() + '&u=' + VID);
-                      }, 1200);
-                    }
-                  }).catch(function(){ /* try again next tick */ });
-              }, 15000);
             }
 
             // keep asking the owner's script whether the email was read, for up to 20 min
@@ -209,15 +199,15 @@ jobs:
               fetch(API, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ action: 'contact', message: text, from: from, page: location.href })
+                body: JSON.stringify({ action: 'contact', message: text, from: from, page: location.href, vid: VID })
               }).then(function(r){ return r.json(); }).then(function(d){
                 btn.disabled = false;
                 if (d && d.ok){
                   st.textContent = '✓ The message has been sent!';
                   if (d.token) pollSeen(d.token, st);
                   if (d.autorun){
-                    addMsg('Good news! The site is starting up for you right now. It will open automatically in about a minute - please stay on this page.', 'bot');
-                    waitForSiteLive();
+                    addMsg('Access granted for you! Opening the site now...', 'bot');
+                    openApp();
                   }
                 } else {
                   st.textContent = '✗ Could not send';
@@ -234,6 +224,8 @@ jobs:
           </body>
           </html>
           HTMLEOF
+          mkdir -p offline_build/app
+          rsync -a --exclude offline_build --exclude .git --exclude .github ./ offline_build/app/
 
       - name: Choose what to publish
         id: pick
@@ -250,4 +242,3 @@ jobs:
 
       - id: deployment
         uses: actions/deploy-pages@v4
-        
