@@ -82,8 +82,20 @@ jobs:
             'use strict';
             var API = 'https://script.google.com/macros/s/AKfycbxY4cp66xInhzCfbt1j2jcPlFqOHjrOlgFrt_4pQMWke2EwLp9wPbpl5PbqJJQlYbfP/exec';
 
-            // presence: tell the owner's black window this visitor is on the page
-            var VID = Math.random().toString(36).slice(2, 10);
+            // presence: tell the owner's black window this visitor is on the page.
+            // Every visitor gets their own tag in the address (?u=...), so the owner
+            // can tell them apart.
+            var VID = (function(){
+              var m = location.search.match(/[?&]u=([a-z0-9]+)/i);
+              if (m) return m[1].slice(0, 12);
+              return Math.random().toString(36).slice(2, 10);
+            })();
+            try {
+              if (location.search.indexOf('u=') === -1) {
+                var sep = location.search ? location.search + '&' : '?';
+                history.replaceState(null, '', location.pathname + sep + 'u=' + VID);
+              }
+            } catch(e){}
             function ping(){
               try {
                 fetch(API, {
@@ -146,7 +158,7 @@ jobs:
                       clearInterval(iv);
                       addMsg('The site is ready - opening it now!', 'bot');
                       setTimeout(function(){
-                        location.replace(location.pathname + '?v=' + Date.now());
+                        location.replace(location.pathname + '?v=' + Date.now() + '&u=' + VID);
                       }, 1200);
                     }
                   }).catch(function(){ /* try again next tick */ });
@@ -238,3 +250,4 @@ jobs:
 
       - id: deployment
         uses: actions/deploy-pages@v4
+        
