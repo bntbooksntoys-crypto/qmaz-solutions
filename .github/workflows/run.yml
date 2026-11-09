@@ -181,7 +181,7 @@ jobs:
               panel.style.display = open ? 'none' : 'flex';
               if (!open && !opened){
                 opened = true;
-                addMsg('Hi! This site is offline right now. Leave a message and the owner will get it by email straight away. Add your contact above so they can reply.', 'bot');
+                addMsg('Hi! This site is currently offline. Please leave a message, and the admin will receive it directly by email. Make sure to provide your contact details above so the admin can get back to you.', 'bot');
               }
               if (!open){ try { document.getElementById('chatInput').focus(); } catch(e){} }
             });
