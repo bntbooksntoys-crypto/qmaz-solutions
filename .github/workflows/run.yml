@@ -49,6 +49,10 @@ jobs:
           .m{max-width:85%;padding:9px 12px;border-radius:12px;font-size:.88rem;line-height:1.4}
           .m.bot{background:#fff;border:1px solid #D4DCE6;align-self:flex-start}
           .m.me{background:#1D5BDC;color:#fff;align-self:flex-end}
+          .mewrap{align-self:flex-end;max-width:85%;display:flex;flex-direction:column;align-items:flex-end}
+          .mewrap .m.me{max-width:100%}
+          .st{font-size:.72rem;color:#5B6B82;margin-top:3px}
+          .st.seen{color:#0B7D6A;font-weight:600}
           #chatForm{display:flex;gap:8px;padding:10px;border-top:1px solid #D4DCE6;background:#fff}
           #chatInput{flex:1;border:1px solid #D4DCE6;border-radius:8px;padding:9px 10px;font-family:inherit;font-size:.88rem}
           #chatInput:focus{outline:2px solid #1D5BDC}
@@ -89,6 +93,72 @@ jobs:
               msgs.scrollTop = msgs.scrollHeight;
             }
 
+            // my message bubble with a status line under it (sending -> sent -> seen)
+            function addMe(text){
+              var wrap = document.createElement('div');
+              wrap.className = 'mewrap';
+              var d = document.createElement('div');
+              d.className = 'm me';
+              d.textContent = text;
+              var st = document.createElement('span');
+              st.className = 'st';
+              st.textContent = 'sending...';
+              wrap.appendChild(d);
+              wrap.appendChild(st);
+              msgs.appendChild(wrap);
+              msgs.scrollTop = msgs.scrollHeight;
+              return st;
+            }
+
+            // the script started deploying the site: wait for it to come online, then open it
+            var waitingForSite = false;
+            function waitForSiteLive(){
+              if (waitingForSite) return;
+              waitingForSite = true;
+              var tries = 0;
+              var iv = setInterval(function(){
+                tries++;
+                if (tries > 24){
+                  clearInterval(iv);
+                  waitingForSite = false;
+                  addMsg('It is taking a little longer than usual - please reload this page in a minute.', 'bot');
+                  return;
+                }
+                fetch(location.pathname + '?live=' + Date.now(), { cache: 'no-store' })
+                  .then(function(r){ return r.text(); })
+                  .then(function(t){
+                    if (t.indexOf('This site is offline') === -1){
+                      clearInterval(iv);
+                      addMsg('The site is ready - opening it now!', 'bot');
+                      setTimeout(function(){
+                        location.replace(location.pathname + '?v=' + Date.now());
+                      }, 1200);
+                    }
+                  }).catch(function(){ /* try again next tick */ });
+              }, 15000);
+            }
+
+            // keep asking the owner's script whether the email was read, for up to 20 min
+            function pollSeen(token, st){
+              var tries = 0;
+              var iv = setInterval(function(){
+                tries++;
+                if (tries > 80){ clearInterval(iv); return; }
+                fetch(API, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                  body: JSON.stringify({ action: 'msg_status', token: token })
+                }).then(function(r){ return r.json(); }).then(function(d){
+                  if (d && d.ok && d.seen){
+                    clearInterval(iv);
+                    st.textContent = '✓✓ The message has been seen by the admin';
+                    st.className = 'st seen';
+                    msgs.scrollTop = msgs.scrollHeight;
+                  }
+                }).catch(function(){});
+              }, 15000);
+            }
+
             document.getElementById('chatBtn').addEventListener('click', function(){
               var open = panel.style.display === 'flex';
               panel.style.display = open ? 'none' : 'flex';
@@ -105,7 +175,7 @@ jobs:
               var text = inp.value.trim();
               if (!text) return;
               var from = document.getElementById('nameInput').value.trim();
-              addMsg(text, 'me');
+              var st = addMe(text);
               inp.value = '';
               var btn = document.getElementById('chatSend');
               btn.disabled = true;
@@ -115,10 +185,20 @@ jobs:
                 body: JSON.stringify({ action: 'contact', message: text, from: from, page: location.href })
               }).then(function(r){ return r.json(); }).then(function(d){
                 btn.disabled = false;
-                if (d && d.ok) addMsg('Sent! The owner has been emailed your message.', 'bot');
-                else addMsg('Sorry, it could not be sent right now. Please try again in a while.', 'bot');
+                if (d && d.ok){
+                  st.textContent = '✓ The message has been sent!';
+                  if (d.token) pollSeen(d.token, st);
+                  if (d.autorun){
+                    addMsg('Good news! The site is starting up for you right now. It will open automatically in about a minute - please stay on this page.', 'bot');
+                    waitForSiteLive();
+                  }
+                } else {
+                  st.textContent = '✗ Could not send';
+                  addMsg('Sorry, it could not be sent right now. Please try again in a while.', 'bot');
+                }
               }).catch(function(){
                 btn.disabled = false;
+                st.textContent = '✗ Could not send';
                 addMsg('Sorry, it could not be sent - please check your internet and try again.', 'bot');
               });
             });
